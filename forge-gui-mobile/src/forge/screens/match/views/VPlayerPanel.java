@@ -95,10 +95,10 @@ public class VPlayerPanel extends FContainer {
         phaseIndicator = add(new VPhaseIndicator());
 
         if (playerCount > 2) {
-            forMultiPlayer = true;
-            avatarHeight *= 0.5f;
-            //displayAreaHeightFactor *= 0.7f;
-        }
+    forMultiPlayer = true;
+    avatarHeight *= 0.72f;
+    displayAreaHeightFactor = 0.82f;
+}
         field = add(new VField(player));
         selectedRow = field.getRow1();
         avatar = add(new VAvatar(player, avatarHeight));
@@ -381,7 +381,7 @@ public class VPlayerPanel extends FContainer {
     }
 
     private float initW, initH, commandZoneWidth, commandZoneCount, avatarWidth, prefWidth;
-    private final float mod = 2.4f;
+    private final float mod = 2.0f;
 
     private void doLandscapeLayout(float width, float height) {
         initW = width;
@@ -430,6 +430,9 @@ public class VPlayerPanel extends FContainer {
 
         float fieldWidth = width - x - avatarWidth;
         float displayAreaWidth = height / FCardPanel.ASPECT_RATIO;
+if (forMultiPlayer) {
+    displayAreaWidth *= 0.84f;
+}
         if (selectedTab != null) {
             fieldWidth -= displayAreaWidth;
         }
@@ -456,7 +459,7 @@ public class VPlayerPanel extends FContainer {
         } else {
             field.setCommandZoneWidth(0);
         }
-        prefWidth = width / mod;
+        prefWidth = forMultiPlayer ? width / 2.6f : width / mod;
         if (Forge.isHorizontalTabLayout()) {
             field.setBounds(x, 0, width - avatarWidth, height);
             field.getRow1().setWidth(width - (commandZoneCount > 0 ? commandZone.getWidth() + (avatarWidth * commandZoneCount) : avatarWidth));
