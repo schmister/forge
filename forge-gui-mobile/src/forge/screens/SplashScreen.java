@@ -239,7 +239,10 @@ public class SplashScreen extends FContainer {
         progressBar.setBounds(pbX, pbY, pbW, pbH);
         g.draw(progressBar);
 
-        if (showEnterButton) ensureEnterButton(panelX, panelY, panelW, panelH);
+        if (showEnterButton) {
+    progressBar.setDescription("Ready to play.");
+    ensureEnterButton(panelX, panelY, panelW, panelH);
+}
 
         String version = "Engine build " + Forge.getDeviceAdapter().getVersionString();
         g.drawText(version, smallFont, MUTED,
