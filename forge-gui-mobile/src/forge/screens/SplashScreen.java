@@ -1,5 +1,6 @@
 package forge.screens;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -14,35 +15,58 @@ import forge.toolbox.FButton;
 import forge.toolbox.FContainer;
 import forge.toolbox.FProgressBar;
 
+/**
+ * Schmister MTG full-screen loading screen.
+ *
+ * Visual artwork is loaded directly from the Android assets folder:
+ * forge-gui-android/assets/schmister_mtg_splash.png
+ *
+ * Forge startup progress remains live underneath this presentation layer.
+ */
 public class SplashScreen extends FContainer {
     private TextureRegion splashTexture;
     private Texture splashBGTexture;
+    private Texture schmisterTexture;
+    private TextureRegion schmisterRegion;
+
     private FProgressBar progressBar;
-    private FSkinFont titleFont, subtitleFont, statusFont, smallFont;
-    private boolean preparedForDialogs, showModeSelector, init, hideBtn, startClassic, clear;
     private FButton btnHome;
+
+    private FSkinFont buttonFont;
+    private FSkinFont versionFont;
+
+    private boolean preparedForDialogs;
+    private boolean showModeSelector;
+    private boolean buttonCreated;
+    private boolean ready;
+    private boolean clear;
+
     private BGAnimation bgAnimation;
 
-    private static final Color BG = new Color(0.012f, 0.014f, 0.020f, 1f);
-    private static final Color SCRIM = new Color(0.015f, 0.018f, 0.025f, 0.72f);
-    private static final Color PANEL = new Color(0.030f, 0.035f, 0.047f, 0.82f);
-    private static final Color PANEL_INNER = new Color(0.055f, 0.060f, 0.075f, 0.78f);
-    private static final Color BORDER = new Color(0.55f, 0.50f, 0.38f, 0.95f);
-    private static final Color TEXT = new Color(0.97f, 0.95f, 0.89f, 1f);
-    private static final Color MUTED = new Color(0.72f, 0.70f, 0.66f, 1f);
-    private static final Color WHITE = new Color(0.91f, 0.85f, 0.66f, 1f);
-    private static final Color BLUE = new Color(0.18f, 0.48f, 0.82f, 1f);
-    private static final Color BLACK = new Color(0.30f, 0.25f, 0.34f, 1f);
-    private static final Color RED = new Color(0.75f, 0.20f, 0.15f, 1f);
-    private static final Color GREEN = new Color(0.18f, 0.48f, 0.26f, 1f);
+    private static final Color VERSION_COLOR = new Color(1.00f, 0.87f, 0.55f, 1f);
 
     public SplashScreen() {
         progressBar = getProgressBar();
         bgAnimation = getBgAnimation();
+        loadSchmisterArtwork();
+    }
+
+    private void loadSchmisterArtwork() {
+        try {
+            schmisterTexture = new Texture(Gdx.files.internal("schmister_mtg_splash.png"));
+            schmisterTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+            schmisterRegion = new TextureRegion(schmisterTexture);
+        } catch (Exception e) {
+            // Fallback to Forge-provided splash texture if the custom asset is missing.
+            schmisterTexture = null;
+            schmisterRegion = null;
+        }
     }
 
     public BGAnimation getBgAnimation() {
-        if (bgAnimation == null) bgAnimation = new BGAnimation();
+        if (bgAnimation == null) {
+            bgAnimation = new BGAnimation();
+        }
         return bgAnimation;
     }
 
@@ -54,223 +78,205 @@ public class SplashScreen extends FContainer {
         return progressBar;
     }
 
-    public void setSplashTexture(TextureRegion textureRegion) { splashTexture = textureRegion; }
-    public void setSplashBGTexture(Texture texture) { splashBGTexture = texture; }
+    public void setSplashTexture(TextureRegion textureRegion) {
+        splashTexture = textureRegion;
+    }
 
+    public void setSplashBGTexture(Texture texture) {
+        splashBGTexture = texture;
+    }
+
+    /** Called by Forge when startup has finished. */
     public void startClassic() {
-        startClassic = true;
-        hideBtn = true;
-        bgAnimation.DURATION = 0.55f;
-        bgAnimation.progress = 0f;
-        bgAnimation.openAdventure = false;
+        ready = true;
+        progressBar.setDescription("Ready to play.");
+        ensureEnterButton();
     }
 
     @Override
-    protected void doLayout(float width, float height) { }
+    protected void doLayout(float width, float height) {
+        layoutControls(width, height);
+    }
 
     public void prepareForDialogs() {
-        if (preparedForDialogs) return;
+        if (preparedForDialogs) {
+            return;
+        }
+
         Color defaultColor = new Color(0, 0, 0, 0);
         for (final FSkinColor.Colors c : FSkinColor.Colors.values()) {
             switch (c) {
                 case CLR_BORDERS:
                 case CLR_TEXT:
-                    c.setColor(FProgressBar.SEL_FORE_COLOR); break;
+                    c.setColor(FProgressBar.SEL_FORE_COLOR);
+                    break;
                 case CLR_ACTIVE:
                 case CLR_THEME2:
-                    c.setColor(FProgressBar.SEL_BACK_COLOR); break;
+                    c.setColor(FProgressBar.SEL_BACK_COLOR);
+                    break;
                 case CLR_INACTIVE:
-                    c.setColor(FSkinColor.stepColor(FProgressBar.SEL_BACK_COLOR, -80)); break;
+                    c.setColor(FSkinColor.stepColor(FProgressBar.SEL_BACK_COLOR, -80));
+                    break;
                 default:
-                    c.setColor(defaultColor); break;
+                    c.setColor(defaultColor);
+                    break;
             }
         }
         FSkinColor.updateAll();
         preparedForDialogs = true;
     }
 
-    public void setShowModeSelector(boolean value) { showModeSelector = value; }
-    public boolean isShowModeSelector() { return showModeSelector; }
+    public void setShowModeSelector(boolean value) {
+        showModeSelector = value;
+        if (value) {
+            ready = true;
+            progressBar.setDescription("Ready to play.");
+            ensureEnterButton();
+        }
+    }
+
+    public boolean isShowModeSelector() {
+        return showModeSelector;
+    }
 
     private void ensureFonts() {
-        if (titleFont == null) titleFont = FSkinFont.get(40);
-        if (subtitleFont == null) subtitleFont = FSkinFont.get(18);
-        if (statusFont == null) statusFont = FSkinFont.get(14);
-        if (smallFont == null) smallFont = FSkinFont.get(10);
+        if (buttonFont == null) {
+            buttonFont = FSkinFont.get(22);
+        }
+        if (versionFont == null) {
+            versionFont = FSkinFont.get(10);
+        }
+
         if (Forge.forcedEnglishonCJKMissing && !clear) {
             clear = true;
             FSkinFont.preloadAll("");
-            titleFont = FSkinFont.get(40);
-            subtitleFont = FSkinFont.get(18);
-            statusFont = FSkinFont.get(14);
-            smallFont = FSkinFont.get(10);
+            buttonFont = FSkinFont.get(22);
+            versionFont = FSkinFont.get(10);
+        }
+    }
+
+    private void ensureEnterButton() {
+        ensureFonts();
+
+        if (!buttonCreated) {
+            buttonCreated = true;
+
+            btnHome = new FButton("ENTER SCHMISTER MTG");
+            btnHome.setFont(buttonFont);
+            btnHome.setCommand(e -> {
+                Forge.openHomeDefault();
+                Forge.clearSplashScreen();
+            });
+
+            add(btnHome);
+        }
+
+        btnHome.setVisible(true);
+        layoutControls(getWidth(), getHeight());
+    }
+
+    /**
+     * Cover-fit: artwork fills the whole phone screen with no letterboxing.
+     */
+    private void drawCover(Graphics g, TextureRegion image, float width, float height) {
+        if (image == null) {
+            g.fillRect(Color.BLACK, 0, 0, width, height);
+            return;
+        }
+
+        float imageRatio = (float) image.getRegionWidth() / (float) image.getRegionHeight();
+        float screenRatio = width / height;
+
+        float drawX;
+        float drawY;
+        float drawW;
+        float drawH;
+
+        if (imageRatio > screenRatio) {
+            drawH = height;
+            drawW = drawH * imageRatio;
+            drawX = (width - drawW) / 2f;
+            drawY = 0f;
+        } else {
+            drawW = width;
+            drawH = drawW / imageRatio;
+            drawX = 0f;
+            drawY = (height - drawH) / 2f;
+        }
+
+        g.drawImage(image, drawX, drawY, drawW, drawH);
+    }
+
+    /**
+     * Positions live Forge controls over the matching ornate frames in the art.
+     */
+    private void layoutControls(float width, float height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        // Loading bar frame in the generated artwork.
+        float progressX = width * 0.175f;
+        float progressY = height * 0.615f;
+        float progressW = width * 0.650f;
+        float progressH = height * 0.058f;
+        progressBar.setBounds(progressX, progressY, progressW, progressH);
+
+        if (btnHome != null) {
+            // Enter-button frame in the generated artwork.
+            float buttonW = width * 0.530f;
+            float buttonH = height * 0.105f;
+            float buttonX = (width - buttonW) / 2f;
+            float buttonY = height * 0.735f;
+            btnHome.setBounds(buttonX, buttonY, buttonW, buttonH);
         }
     }
 
     private class BGAnimation extends ForgeAnimation {
-        float DURATION = 0.8f;
-        private float progress = 0f;
-        private boolean openAdventure;
-
-        public void drawBackground(Graphics g) {
-            float percentage = Math.max(0f, Math.min(1f, progress / DURATION));
-            if (startClassic) {
-                drawSchmisterSplash(g, 1f - percentage, false);
-                return;
-            }
-            drawSchmisterSplash(g, 1f, showModeSelector);
-            if (hideBtn && btnHome != null) {
-                float y = btnHome.getTop();
-                btnHome.setTop(y + getHeight() * 0.08f * percentage);
-            }
-        }
-
         @Override
         protected boolean advance(float dt) {
-            progress += dt;
-            return progress < DURATION;
+            // Keep animation object alive while Forge starts up.
+            return !ready;
         }
 
         @Override
         protected void onEnd(boolean endingAll) {
-            if (startClassic || hideBtn) {
-                if (openAdventure) Forge.openAdventure();
-                else Forge.openHomeDefault();
-                Forge.clearSplashScreen();
-            }
+            // User enters through the on-screen button.
         }
     }
 
     @Override
     protected void drawBackground(Graphics g) {
-        bgAnimation.start();
-        bgAnimation.drawBackground(g);
-    }
-
-    private void drawCoverImage(Graphics g, TextureRegion image, float width, float height) {
-        if (image == null) {
-            g.fillRect(BG, 0, 0, width, height);
-            return;
-        }
-        float imageRatio = (float) image.getRegionWidth() / (float) image.getRegionHeight();
-        float screenRatio = width / height;
-        float x, y, w, h;
-        if (imageRatio > screenRatio) {
-            h = height;
-            w = h * imageRatio;
-            x = (width - w) / 2f;
-            y = 0f;
-        } else {
-            w = width;
-            h = w / imageRatio;
-            x = 0f;
-            y = (height - h) / 2f;
-        }
-        g.drawImage(image, x, y, w, h);
-    }
-
-    private void drawManaRail(Graphics g, float x, float y, float width, float height) {
-        float segment = width / 5f;
-        g.fillRect(WHITE, x, y, segment, height);
-        g.fillRect(BLUE, x + segment, y, segment, height);
-        g.fillRect(BLACK, x + segment * 2f, y, segment, height);
-        g.fillRect(RED, x + segment * 3f, y, segment, height);
-        g.fillRect(GREEN, x + segment * 4f, y, width - segment * 4f, height);
-    }
-
-    private void drawSchmisterSplash(Graphics g, float alpha, boolean showEnterButton) {
         ensureFonts();
-        float oldAlpha = g.getfloatAlphaComposite();
-        g.setAlphaComposite(alpha);
-        final float w = getWidth();
-        final float h = getHeight();
 
-        g.fillRect(BG, 0, 0, w, h);
-        drawCoverImage(g, splashTexture, w, h);
-        g.fillRect(SCRIM, 0, 0, w, h);
+        float width = getWidth();
+        float height = getHeight();
 
-        float manaRailH = Math.max(5f, h * 0.012f);
-        drawManaRail(g, 0f, 0f, w, manaRailH);
-        drawManaRail(g, 0f, h - manaRailH, w, manaRailH);
+        TextureRegion art = schmisterRegion != null ? schmisterRegion : splashTexture;
+        drawCover(g, art, width, height);
+        layoutControls(width, height);
 
-        float panelW = Forge.isLandscapeMode() ? w * 0.88f : w * 0.92f;
-        float panelH = Forge.isLandscapeMode() ? h * 0.82f : h * 0.82f;
-        float panelX = (w - panelW) / 2f;
-        float panelY = (h - panelH) / 2f;
-
-        g.fillRect(PANEL, panelX, panelY, panelW, panelH);
-
-        float frame = Math.max(2f, h * 0.005f);
-        g.fillRect(BORDER, panelX, panelY, panelW, frame);
-        g.fillRect(BORDER, panelX, panelY + panelH - frame, panelW, frame);
-        g.fillRect(BORDER, panelX, panelY, frame, panelH);
-        g.fillRect(BORDER, panelX + panelW - frame, panelY, frame, panelH);
-
-        float inset = Math.max(12f, panelW * 0.022f);
-        g.fillRect(PANEL_INNER, panelX + inset, panelY + inset,
-                panelW - inset * 2f, panelH - inset * 2f);
-
-        float titleY = panelY + panelH * 0.11f;
-        float titleH = panelH * 0.22f;
-        g.drawText("SCHMISTER MTG", titleFont, TEXT,
-                panelX + inset, titleY, panelW - inset * 2f, titleH,
-                false, Align.center, true);
-
-        g.drawText("COMMANDER PLAYTESTING", subtitleFont, WHITE,
-                panelX + inset, titleY + titleH * 0.72f,
-                panelW - inset * 2f, titleH * 0.42f,
-                false, Align.center, true);
-
-        float dividerW = panelW * 0.54f;
-        float dividerX = panelX + (panelW - dividerW) / 2f;
-        float dividerY = panelY + panelH * 0.40f;
-        float dividerH = Math.max(4f, h * 0.008f);
-        drawManaRail(g, dividerX, dividerY, dividerW, dividerH);
-
-        g.drawText("BUILD  •  PLAY  •  TEST", statusFont, MUTED,
-                panelX + inset, panelY + panelH * 0.45f,
-                panelW - inset * 2f, panelH * 0.08f,
-                false, Align.center, true);
-
-        float pbW = panelW * 0.72f;
-        float pbH = Math.max(36f, panelH * 0.09f);
-        float pbX = panelX + (panelW - pbW) / 2f;
-        float pbY = panelY + panelH * 0.59f;
-        progressBar.setBounds(pbX, pbY, pbW, pbH);
+        // Keep Forge's real loading status and percentage live.
         g.draw(progressBar);
 
-        if (showEnterButton) {
-    progressBar.setDescription("Ready to play.");
-    ensureEnterButton(panelX, panelY, panelW, panelH);
-}
-
-        String version = "Engine build " + Forge.getDeviceAdapter().getVersionString();
-        g.drawText(version, smallFont, MUTED,
-                panelX + inset, panelY + panelH - inset * 1.7f,
-                panelW - inset * 2f, smallFont.getLineHeight() * 1.5f,
-                false, Align.center, true);
-
-        g.setAlphaComposite(oldAlpha);
-    }
-
-    private void ensureEnterButton(float panelX, float panelY, float panelW, float panelH) {
-        if (!init) {
-            init = true;
-            btnHome = new FButton("ENTER SCHMISTER MTG");
-            btnHome.setFont(FSkinFont.get(24));
-            btnHome.setCommand(e -> {
-                hideBtn = true;
-                startClassic = true;
-                bgAnimation.progress = 0f;
-                bgAnimation.openAdventure = false;
-            });
-            add(btnHome);
+        if (ready || showModeSelector) {
+            progressBar.setDescription("Ready to play.");
+            ensureEnterButton();
         }
 
-        float btnW = panelW * 0.62f;
-        float btnH = Math.max(56f, panelH * 0.12f);
-        float btnX = panelX + (panelW - btnW) / 2f;
-        float btnY = panelY + panelH * 0.75f;
-        btnHome.setBounds(btnX, btnY, btnW, btnH);
+        // Live engine build text at the bottom of the art.
+        String version = "Engine build " + Forge.getDeviceAdapter().getVersionString();
+        g.drawText(
+                version,
+                versionFont,
+                VERSION_COLOR,
+                0,
+                height * 0.900f,
+                width,
+                height * 0.035f,
+                false,
+                Align.center,
+                true
+        );
     }
 }
