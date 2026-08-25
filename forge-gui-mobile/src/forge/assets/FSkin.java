@@ -45,14 +45,13 @@ public class FSkin {
     public static void changeSkin(final String skinName) {
         if (skinName.equals(FModel.getPreferences().getPref(FPref.UI_SKIN))) { return; }
 
-        //save skin preference
         saveSkinName(FModel.getPreferences(), skinName);
 
         Forge.setTransitionScreen(new TransitionScreen(() -> FThreads.invokeInBackgroundThread(() -> FThreads.invokeInEdtLater(() -> {
             final LoadingOverlay loader = new LoadingOverlay(Forge.getLocalizer().getMessageorUseDefault("lblRestartInFewSeconds", "Forge will restart after a few seconds..."), true);
             loader.show();
             FThreads.invokeInBackgroundThread(() -> {
-                FSkinFont.deleteCachedFiles(); //delete cached font files so font can be update for new skin
+                FSkinFont.deleteCachedFiles();
                 FThreads.delayInEDT(2000, () -> {
                     Forge.clearTransitionScreen();
                     FThreads.invokeInEdtLater(() -> Forge.restart(true));
@@ -60,6 +59,7 @@ public class FSkin {
             });
         })), null, false, true));
     }
+
     public static boolean isThemeValid(FileHandle themeDir, String themeName, boolean silent) {
         int missing = 0;
         if (!themeDir.child("bg_splash.png").exists()) {
@@ -89,6 +89,7 @@ public class FSkin {
         }
         return missing == 0;
     }
+
     private static void checkThemeDir(FileHandle themeDir, String themeName) {
         if (themeDir == null || !themeDir.exists() || !themeDir.isDirectory()) {
             System.err.println("Skin not found. Defaulting to fallback_skin.");
@@ -99,7 +100,6 @@ public class FSkin {
                 final FileHandle def = Assets.getFileHandle(ForgeConstants.DEFAULT_SKINS_DIR);
                 if (def.exists() && def.isDirectory() && isThemeValid(def, "", true)) {
                     FSkinFont.deleteCachedFiles();
-                    //use default skin if valid
                     preferredDir = def;
                     saveSkinName(FModel.getPreferences(), "Default");
                 } else {
@@ -108,70 +108,53 @@ public class FSkin {
             }
         }
     }
+
     private static void useFallbackDir() {
-        // iOS and Android both need to use internal() for bundled resources
         preferredDir = GuiBase.isMobile() ? Gdx.files.internal("fallback_skin") : Gdx.files.classpath("fallback_skin");
     }
-    public static void loadLight(String skinName, final SplashScreen splashScreen,FileHandle prefDir) {
+
+    public static void loadLight(String skinName, final SplashScreen splashScreen, FileHandle prefDir) {
         preferredDir = prefDir;
-        loadLight(skinName,splashScreen);
+        loadLight(skinName, splashScreen);
     }
-    /*
-     * Loads a "light" version of FSkin, just enough for the splash screen:
-     * skin name. Generates custom skin settings, fonts, and backgrounds.
-     * 
-     * 
-     * @param skinName
-     *            the skin name
-     */
+
     public static void loadLight(String skinName, final SplashScreen splashScreen) {
         preferredName = skinName.toLowerCase().replace(' ', '_');
 
-        //reset hd buttons/icons
         Forge.hdbuttons = false;
         Forge.hdstart = false;
-        // TODO: the "v2" string should be a property of the default skin.
-        // iOS: the bundle is read-only, so the marker file lives in writable local storage
+
         FileHandle v2File;
         if (GuiBase.isIOS()) {
             v2File = Gdx.files.local("fonts/v2");
         } else {
-            // Other platforms: the standard location
             v2File = Assets.getFileHandle(ForgeConstants.FONTS_DIR + "v2");
         }
 
         if (v2File == null || !v2File.exists()) {
-            //delete cached fonts
             FSkinFont.deleteCachedFiles();
             try {
                 if (v2File != null) {
-                    // Ensure parent directory exists
                     FileHandle parent = v2File.parent();
                     if (parent != null && !parent.exists()) {
                         parent.mkdirs();
                     }
-                    // Create the marker file using libGDX API
                     v2File.writeString("", false);
                 }
             } catch (Exception e) {
-                // iOS compatibility: Silently ignore if we can't create the marker file
-                // The font cache will be deleted each time, which is safe but less efficient
                 System.err.println("Warning: Could not create font version marker file: " + e.getMessage());
             }
         }
 
-        //ensure skins directory exists
         final FileHandle dir = Assets.getFileHandle(ForgeConstants.CACHE_SKINS_DIR);
-        if(preferredDir == null)
-        {
+        if (preferredDir == null) {
             if (!dir.exists() || !dir.isDirectory()) {
-                //if skins directory doesn't exist, point to internal assets/skin directory instead for the sake of the splash screen
                 useFallbackDir();
             } else {
                 if (splashScreen != null) {
-                    if (allSkins == null) { //initialize
+                    if (allSkins == null) {
                         allSkins = new Array<>();
-                        allSkins.add("Default"); //init default
+                        allSkins.add("Default");
                         final Array<String> skinDirectoryNames = getSkinDirectoryNames();
                         for (final String skinDirectoryName : skinDirectoryNames) {
                             allSkins.add(WordUtil.capitalize(skinDirectoryName.replace('_', ' ')));
@@ -180,19 +163,21 @@ public class FSkin {
                     }
                 }
 
-                // Non-default (preferred) skin name and dir.
-                preferredDir = Assets.getFileHandle(preferredName.equalsIgnoreCase("default") ? ForgeConstants.BASE_SKINS_DIR + preferredName : ForgeConstants.CACHE_SKINS_DIR + preferredName);
+                preferredDir = Assets.getFileHandle(
+                        preferredName.equalsIgnoreCase("default")
+                                ? ForgeConstants.BASE_SKINS_DIR + preferredName
+                                : ForgeConstants.CACHE_SKINS_DIR + preferredName
+                );
                 if (!preferredDir.exists() || !preferredDir.isDirectory()) {
                     preferredDir.mkdirs();
                 }
             }
         }
-        //check theme
+
         checkThemeDir(preferredDir, preferredName);
 
-        FSkinTexture.BG_TEXTURE.load(); //load background texture early for splash screen
+        FSkinTexture.BG_TEXTURE.load();
 
-        //load theme logo while changing skins
         Forge.getAssets().loadTexture(getSkinFile("hd_logo.png"));
         Forge.getAssets().loadTexture(getDefaultSkinFile("adv_logo.png"), new TextureLoader.TextureParameter());
         Forge.getAssets().loadTexture(getDefaultSkinFile("cover.png"));
@@ -204,9 +189,10 @@ public class FSkin {
 
         if (splashScreen != null) {
             final FileHandle f = getSkinFile("bg_splash.png");
-            final FileHandle f2 = getSkinFile("bg_splash_hd.png"); //HD Splashscreen
-            FileHandle f3 = getSkinFile("adv_bg_splash.png"); //Adventure splash
-            FileHandle f4 = getSkinFile("adv_bg_texture.jpg"); //Adventure splash
+            final FileHandle f2 = getSkinFile("bg_splash_hd.png");
+            FileHandle f3 = getSkinFile("adv_bg_splash.png");
+            FileHandle f4 = getSkinFile("adv_bg_texture.jpg");
+
             if (!f3.exists())
                 f3 = getDefaultSkinFile("adv_bg_splash.png");
             if (!f4.exists())
@@ -220,33 +206,64 @@ public class FSkin {
             }
 
             try {
-                int w, h;
-                if (f.path().contains("fallback_skin")) {
-                    Texture txSplash = Forge.getAssets().getTexture(f);
-                    w = txSplash.getWidth();
-                    h = txSplash.getHeight();
-                    splashScreen.setSplashTexture(new TextureRegion(txSplash, 0, 0, w, h - 100));
-                } else {
-                    Forge.getAssets().loadTexture(f);
-                    w = Forge.getAssets().getTexture(f).getWidth();
-                    h = Forge.getAssets().getTexture(f).getHeight();
+                int w;
+                int h;
+                boolean schmisterSplashLoaded = false;
 
-                    if (f2.exists()) {
-                        Forge.getAssets().loadTexture(f2);
-                        splashScreen.setSplashTexture(new TextureRegion(Forge.getAssets().getTexture(f2)));
+                /*
+                 * SCHMISTER MTG CUSTOM SPLASH
+                 *
+                 * Android/iOS assets are bundled as internal files. Prefer our
+                 * custom full-screen artwork regardless of selected Forge skin.
+                 * If it is ever missing, Forge automatically falls back to its
+                 * original splash behavior below.
+                 */
+                final FileHandle schmisterSplash =
+                        GuiBase.isMobile()
+                                ? Gdx.files.internal("schmister_mtg_splash.png")
+                                : Gdx.files.classpath("schmister_mtg_splash.png");
+
+                if (schmisterSplash.exists()) {
+                    Forge.getAssets().loadTexture(schmisterSplash);
+                    Texture schmisterTexture = Forge.getAssets().getTexture(schmisterSplash);
+
+                    w = schmisterTexture.getWidth();
+                    h = schmisterTexture.getHeight();
+
+                    splashScreen.setSplashTexture(new TextureRegion(schmisterTexture));
+                    schmisterSplashLoaded = true;
+                } else {
+                    if (f.path().contains("fallback_skin")) {
+                        Texture txSplash = Forge.getAssets().getTexture(f);
+                        w = txSplash.getWidth();
+                        h = txSplash.getHeight();
+                        splashScreen.setSplashTexture(new TextureRegion(txSplash, 0, 0, w, h - 100));
                     } else {
-                        splashScreen.setSplashTexture(new TextureRegion(Forge.getAssets().getTexture(f), 0, 0, w, h - 100));
+                        Forge.getAssets().loadTexture(f);
+                        w = Forge.getAssets().getTexture(f).getWidth();
+                        h = Forge.getAssets().getTexture(f).getHeight();
+
+                        if (f2.exists()) {
+                            Forge.getAssets().loadTexture(f2);
+                            splashScreen.setSplashTexture(new TextureRegion(Forge.getAssets().getTexture(f2)));
+                        } else {
+                            splashScreen.setSplashTexture(new TextureRegion(
+                                    Forge.getAssets().getTexture(f), 0, 0, w, h - 100));
+                        }
                     }
                 }
-                Pixmap pxSplash = new Pixmap(f);
-                //override splashscreen startup
-                if (Forge.selector.equals("Adventure")) {
+
+                /*
+                 * Preserve Forge Adventure splash handling only when the custom
+                 * Schmister splash is unavailable. Schmister MTG presents one
+                 * unified startup screen.
+                 */
+                if (!schmisterSplashLoaded && Forge.selector.equals("Adventure")) {
                     if (f3.exists()) {
                         Texture advSplash = Forge.getAssets().getTexture(f3, true, false);
                         w = advSplash.getWidth();
                         h = advSplash.getHeight();
                         splashScreen.setSplashTexture(new TextureRegion(advSplash, 0, 0, w, h - 100));
-                        pxSplash = new Pixmap(f3);
                     }
                     if (f4.exists()) {
                         Texture advBG = Forge.getAssets().getTexture(f4, true, false);
@@ -254,48 +271,43 @@ public class FSkin {
                         splashScreen.setSplashBGTexture(advBG);
                     }
                 }
-                FProgressBar.BACK_COLOR = new Color(pxSplash.getPixel(25, h - 75));
-                FProgressBar.FORE_COLOR = new Color(pxSplash.getPixel(75, h - 75));
-                FProgressBar.SEL_BACK_COLOR = new Color(pxSplash.getPixel(25, h - 25));
-                FProgressBar.SEL_FORE_COLOR = new Color(pxSplash.getPixel(75, h - 25));
+
+                if (schmisterSplashLoaded) {
+                    /*
+                     * Molten-lava progress colors that match the custom artwork.
+                     * These replace Forge's cyan splash progress styling.
+                     */
+                    FProgressBar.BACK_COLOR = new Color(0.10f, 0.055f, 0.025f, 1f);
+                    FProgressBar.FORE_COLOR = new Color(0.95f, 0.20f, 0.025f, 1f);
+                    FProgressBar.SEL_BACK_COLOR = new Color(0.20f, 0.085f, 0.025f, 1f);
+                    FProgressBar.SEL_FORE_COLOR = new Color(1.00f, 0.90f, 0.62f, 1f);
+                } else {
+                    Pixmap pxSplash = new Pixmap(f);
+                    FProgressBar.BACK_COLOR = new Color(pxSplash.getPixel(25, h - 75));
+                    FProgressBar.FORE_COLOR = new Color(pxSplash.getPixel(75, h - 75));
+                    FProgressBar.SEL_BACK_COLOR = new Color(pxSplash.getPixel(25, h - 25));
+                    FProgressBar.SEL_FORE_COLOR = new Color(pxSplash.getPixel(75, h - 25));
+                    pxSplash.dispose();
+                }
             }
             catch (final Exception e) {
-                //e.printStackTrace();
+                e.printStackTrace();
             }
+
             loaded = true;
         }
     }
 
-    /**
-     * Loads two sprites: the default (which should be a complete
-     * collection of all symbols) and the preferred (which may be
-     * incomplete).
-     * 
-     * Font must be present in the skin folder, and will not
-     * be replaced by default.  The fonts are pre-derived
-     * in this method and saved in a HashMap for future access.
-     * 
-     * Color swatches must be present in the preferred
-     * sprite, and will not be replaced by default.
-     * 
-     * Background images must be present in skin folder,
-     * and will not be replaced by default.
-     * 
-     * Icons, however, will be pulled from the two sprites. Obviously,
-     * preferred takes precedence over default, but if something is
-     * missing, the default picture is retrieved.
-     */
     public static void loadFull(final SplashScreen splashScreen) {
         if (splashScreen != null) {
-            // Preferred skin name must be called via loadLight() method,
-            // which does some cleanup and init work.
-            if (FSkin.preferredName.isEmpty()) { FSkin.loadLight("default", splashScreen); }
+            if (FSkin.preferredName.isEmpty()) {
+                FSkin.loadLight("default", splashScreen);
+            }
         }
 
         Forge.getAssets().avatars().clear();
         Forge.getAssets().sleeves().clear();
 
-        // Grab and test various sprite files.
         final FileHandle f1 = getDefaultSkinFile(ForgeConstants.SPRITE_ICONS_FILE);
         final FileHandle f2 = getSkinFile(ForgeConstants.SPRITE_ICONS_FILE);
         final FileHandle f3 = getDefaultSkinFile(ForgeConstants.SPRITE_FOILS_FILE);
@@ -303,8 +315,6 @@ public class FSkin {
         final FileHandle f5 = getSkinFile(ForgeConstants.SPRITE_AVATARS_FILE);
         final FileHandle f6 = getDefaultSkinFile(ForgeConstants.SPRITE_OLD_FOILS_FILE);
         final FileHandle f7 = getDefaultSkinFile(ForgeConstants.SPRITE_MANAICONS_FILE);
-        //final FileHandle f7b = getDefaultSkinFile(ForgeConstants.SPRITE_PHYREXIAN_FILE);
-        //final FileHandle f7c = getDefaultSkinFile(ForgeConstants.SPRITE_COLORLESS_HYBRID_FILE);
         final FileHandle f8 = getDefaultSkinFile(ForgeConstants.SPRITE_SLEEVES_FILE);
         final FileHandle f9 = getDefaultSkinFile(ForgeConstants.SPRITE_SLEEVES2_FILE);
         final FileHandle f10 = getDefaultSkinFile(ForgeConstants.SPRITE_BORDER_FILE);
@@ -314,19 +324,11 @@ public class FSkin {
         final FileHandle f12b = getDefaultSkinFile(ForgeConstants.SPRITE_START_FILE);
         final FileHandle f13 = getDefaultSkinFile(ForgeConstants.SPRITE_DECKBOX_FILE);
         final FileHandle f17 = getDefaultSkinFile(ForgeConstants.SPRITE_CRACKS_FILE);
-        final FileHandle f19 = getDefaultSkinFile(ForgeConstants.SPRITE_CURSOR_FILE);
+        final FileHandle f19 = getSkinFile(ForgeConstants.SPRITE_CURSOR_FILE);
         final FileHandle f20 = getSkinFile(ForgeConstants.SPRITE_SLEEVES_FILE);
         final FileHandle f21 = getSkinFile(ForgeConstants.SPRITE_SLEEVES2_FILE);
         final FileHandle f22 = getDefaultSkinFile(ForgeConstants.SPRITE_ADV_BUTTONS_FILE);
         final FileHandle f23 = getSkinFile(ForgeConstants.SPRITE_ADV_BUTTONS_FILE);
-
-        /*TODO Themeable
-        final FileHandle f14 = getDefaultSkinFile(ForgeConstants.SPRITE_SETLOGO_FILE);
-        final FileHandle f15 = getSkinFile(ForgeConstants.SPRITE_SETLOGO_FILE);
-        final FileHandle f16 = getDefaultSkinFile(ForgeConstants.SPRITE_WATERMARK_FILE);
-        final FileHandle f24 = getSkinFile(ForgeConstants.SPRITE_ZONE_FILE);
-        final FileHandle f24b = getDefaultSkinFile(ForgeConstants.SPRITE_ZONE_FILE);
-        */
 
         try {
             Forge.getAssets().loadTexture(f1);
@@ -347,7 +349,6 @@ public class FSkin {
             Forge.getAssets().loadTexture(f6);
             Forge.getAssets().loadTexture(f7, new TextureLoader.TextureParameter(){{genMipMaps = true;}});
 
-            //hdbuttons
             if (f11.exists()) {
                 if (!Forge.allowCardBG) {
                     Forge.hdbuttons = false;
@@ -362,7 +363,10 @@ public class FSkin {
                 } else {
                     Forge.hdbuttons = false;
                 }
-            } else { Forge.hdbuttons = false; } //how to refresh buttons when a theme don't have hd buttons?
+            } else {
+                Forge.hdbuttons = false;
+            }
+
             if (f12.exists()) {
                 if (!Forge.allowCardBG) {
                     Forge.hdstart = false;
@@ -377,8 +381,10 @@ public class FSkin {
                 } else {
                     Forge.hdstart = false;
                 }
-            } else { Forge.hdstart = false; }
-            //update colors
+            } else {
+                Forge.hdstart = false;
+            }
+
             for (final FSkinColor.Colors c : FSkinColor.Colors.values()) {
                 if (c.toString().startsWith("ADV_CLR"))
                     c.setColor(new Color(adventureButtons.getPixel(c.getX(), c.getY())));
@@ -386,20 +392,19 @@ public class FSkin {
                     c.setColor(new Color(preferredIcons.getPixel(c.getX(), c.getY())));
             }
 
-            //load images
             for (FSkinProp prop : FSkinProp.values()) {
                 if (FSkinProp.PropType.ABILITY == prop.getType()
                         || FSkinProp.PropType.WATERMARKS == prop.getType()
                         || FSkinProp.PropType.MANAICONS == prop.getType()
                         || FSkinProp.PropType.PHYREXIAN == prop.getType()
                         || FSkinProp.PropType.COLORLESS_HYBRID == prop.getType()
-                        || FSkinProp.PropType.ATTRACTION_LIGHTS == prop.getType()
-                        ) {
+                        || FSkinProp.PropType.ATTRACTION_LIGHTS == prop.getType()) {
                     FSkinImageImpl image = new FSkinImageImpl(prop);
                     image.load(preferredIcons);
                     FSkin.getImages().put(prop, image);
                 }
             }
+
             for (FSkinImage image : FSkinImage.values()) {
                 if (GuiBase.isAndroid()) {
                     if (Forge.allowCardBG)
@@ -413,7 +418,6 @@ public class FSkin {
                 }
             }
 
-            //assemble avatar textures
             int counter = 0;
             int scount = 0;
             Color pxTest;
@@ -421,11 +425,9 @@ public class FSkin {
 
             pxDefaultAvatars = new Pixmap(f4);
             pxDefaultSleeves = new Pixmap(f8);
-            //default avatar
             Forge.getAssets().loadTexture(f4);
-            //sleeves first set
             Forge.getAssets().loadTexture(f8);
-            //preferred avatar
+
             if (f5.exists()) {
                 pxPreferredAvatars = new Pixmap(f5);
                 Forge.getAssets().loadTexture(f5);
@@ -438,13 +440,12 @@ public class FSkin {
                         if (i == 0 && j == 0) { continue; }
                         pxTest = new Color(pxPreferredAvatars.getPixel(i + 50, j + 50));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().avatars().put(counter++, new TextureRegion(Forge.getAssets().getTexture(f5), i, j, 100, 100));
+                        Forge.getAssets().avatars().put(counter++,
+                                new TextureRegion(Forge.getAssets().getTexture(f5), i, j, 100, 100));
                     }
                 }
                 pxPreferredAvatars.dispose();
-            } else if (!FSkin.preferredName.isEmpty()){
-                //workaround bug crash fix if missing sprite avatar on preferred theme for quest tournament...
-                //i really don't know why it needs to populate the avatars twice.... needs investigation
+            } else if (!FSkin.preferredName.isEmpty()) {
                 final int pw = pxDefaultAvatars.getWidth();
                 final int ph = pxDefaultAvatars.getHeight();
 
@@ -453,10 +454,12 @@ public class FSkin {
                         if (i == 0 && j == 0) { continue; }
                         pxTest = new Color(pxDefaultAvatars.getPixel(i + 50, j + 50));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().avatars().put(counter++, new TextureRegion(Forge.getAssets().getTexture(f4), i, j, 100, 100));
+                        Forge.getAssets().avatars().put(counter++,
+                                new TextureRegion(Forge.getAssets().getTexture(f4), i, j, 100, 100));
                     }
                 }
             }
+
             if (f20.exists()) {
                 pxPreferredSleeves = new Pixmap(f20);
                 Forge.getAssets().loadTexture(f20);
@@ -468,7 +471,8 @@ public class FSkin {
                     for (int i = 0; i < sw; i += 360) {
                         pxTest = new Color(pxPreferredSleeves.getPixel(i + 180, j + 250));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().sleeves().put(scount++, new TextureRegion(Forge.getAssets().getTexture(f20), i, j, 360, 500));
+                        Forge.getAssets().sleeves().put(scount++,
+                                new TextureRegion(Forge.getAssets().getTexture(f20), i, j, 360, 500));
                     }
                 }
                 pxPreferredSleeves.dispose();
@@ -480,10 +484,12 @@ public class FSkin {
                     for (int i = 0; i < sw; i += 360) {
                         pxTest = new Color(pxDefaultSleeves.getPixel(i + 180, j + 250));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().sleeves().put(scount++, new TextureRegion(Forge.getAssets().getTexture(f8), i, j, 360, 500));
+                        Forge.getAssets().sleeves().put(scount++,
+                                new TextureRegion(Forge.getAssets().getTexture(f8), i, j, 360, 500));
                     }
                 }
             }
+
             if (f21.exists()) {
                 pxPreferredSleeves = new Pixmap(f21);
                 Forge.getAssets().loadTexture(f21);
@@ -495,12 +501,12 @@ public class FSkin {
                     for (int i = 0; i < sw; i += 360) {
                         pxTest = new Color(pxPreferredSleeves.getPixel(i + 180, j + 250));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().sleeves().put(scount++, new TextureRegion(Forge.getAssets().getTexture(f21), i, j, 360, 500));
+                        Forge.getAssets().sleeves().put(scount++,
+                                new TextureRegion(Forge.getAssets().getTexture(f21), i, j, 360, 500));
                     }
                 }
                 pxPreferredSleeves.dispose();
             } else {
-                //re init second set of sleeves
                 pxDefaultSleeves = new Pixmap(f9);
                 Forge.getAssets().loadTexture(f9);
 
@@ -511,43 +517,56 @@ public class FSkin {
                     for (int i = 0; i < sw2; i += 360) {
                         pxTest = new Color(pxDefaultSleeves.getPixel(i + 180, j + 250));
                         if (pxTest.a == 0) { continue; }
-                        Forge.getAssets().sleeves().put(scount++, new TextureRegion(Forge.getAssets().getTexture(f9), i, j, 360, 500));
+                        Forge.getAssets().sleeves().put(scount++,
+                                new TextureRegion(Forge.getAssets().getTexture(f9), i, j, 360, 500));
                     }
                 }
             }
 
-            //cracks
             Forge.getAssets().loadTexture(f17);
             int crackCount = 0;
             for (int j = 0; j < 4; j++) {
                 int x = j * 200;
-                Forge.getAssets().cracks().put(crackCount++, new TextureRegion(Forge.getAssets().getTexture(f17), x, 0, 200, 279));
+                Forge.getAssets().cracks().put(crackCount++,
+                        new TextureRegion(Forge.getAssets().getTexture(f17), x, 0, 200, 279));
             }
 
-            //borders
             Forge.getAssets().loadTexture(f10);
-            Forge.getAssets().borders().put(0, new TextureRegion(Forge.getAssets().getTexture(f10), 2, 2, 672, 936));
-            Forge.getAssets().borders().put(1, new TextureRegion(Forge.getAssets().getTexture(f10), 676, 2, 672, 936));
-            //deckboxes
+            Forge.getAssets().borders().put(0,
+                    new TextureRegion(Forge.getAssets().getTexture(f10), 2, 2, 672, 936));
+            Forge.getAssets().borders().put(1,
+                    new TextureRegion(Forge.getAssets().getTexture(f10), 676, 2, 672, 936));
+
             Forge.getAssets().loadTexture(f13);
-            //gold bg
-            Forge.getAssets().deckbox().put(0, new TextureRegion(Forge.getAssets().getTexture(f13), 2, 2, 488, 680));
-            //deck box for card art
-            Forge.getAssets().deckbox().put(1, new TextureRegion(Forge.getAssets().getTexture(f13), 492, 2, 488, 680));
-            //generic deck box
-            Forge.getAssets().deckbox().put(2, new TextureRegion(Forge.getAssets().getTexture(f13), 982, 2, 488, 680));
-            //cursor
+            Forge.getAssets().deckbox().put(0,
+                    new TextureRegion(Forge.getAssets().getTexture(f13), 2, 2, 488, 680));
+            Forge.getAssets().deckbox().put(1,
+                    new TextureRegion(Forge.getAssets().getTexture(f13), 492, 2, 488, 680));
+            Forge.getAssets().deckbox().put(2,
+                    new TextureRegion(Forge.getAssets().getTexture(f13), 982, 2, 488, 680));
+
             Forge.getAssets().loadTexture(f19);
-            Forge.getAssets().cursor().put(0, new TextureRegion(Forge.getAssets().getTexture(f19), 0, 0, 32, 32)); //default
-            Forge.getAssets().cursor().put(1, new TextureRegion(Forge.getAssets().getTexture(f19), 32, 0, 32, 32)); //magnify on
-            Forge.getAssets().cursor().put(2, new TextureRegion(Forge.getAssets().getTexture(f19), 64, 0, 32, 32)); // magnify off
+            Forge.getAssets().cursor().put(0,
+                    new TextureRegion(Forge.getAssets().getTexture(f19), 0, 0, 32, 32));
+            Forge.getAssets().cursor().put(1,
+                    new TextureRegion(Forge.getAssets().getTexture(f19), 32, 0, 32, 32));
+            Forge.getAssets().cursor().put(2,
+                    new TextureRegion(Forge.getAssets().getTexture(f19), 64, 0, 32, 32));
 
             Forge.setCursor(Forge.getAssets().cursor().get(0), "0");
-            //set adv_progress bar colors
-            FProgressBar.ADV_BACK_COLOR = new Color(adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_BORDERS.getX(), FSkinColor.Colors.ADV_CLR_BORDERS.getY()));
-            FProgressBar.ADV_FORE_COLOR = new Color(adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_THEME.getX(), FSkinColor.Colors.ADV_CLR_THEME.getY()));
-            FProgressBar.ADV_SEL_BACK_COLOR = new Color(adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_ACTIVE.getX(), FSkinColor.Colors.ADV_CLR_ACTIVE.getY()));
-            FProgressBar.ADV_SEL_FORE_COLOR = new Color(adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_BORDERS.getX(), FSkinColor.Colors.ADV_CLR_BORDERS.getY()));
+
+            FProgressBar.ADV_BACK_COLOR = new Color(
+                    adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_BORDERS.getX(),
+                            FSkinColor.Colors.ADV_CLR_BORDERS.getY()));
+            FProgressBar.ADV_FORE_COLOR = new Color(
+                    adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_THEME.getX(),
+                            FSkinColor.Colors.ADV_CLR_THEME.getY()));
+            FProgressBar.ADV_SEL_BACK_COLOR = new Color(
+                    adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_ACTIVE.getX(),
+                            FSkinColor.Colors.ADV_CLR_ACTIVE.getY()));
+            FProgressBar.ADV_SEL_FORE_COLOR = new Color(
+                    adventureButtons.getPixel(FSkinColor.Colors.ADV_CLR_BORDERS.getX(),
+                            FSkinColor.Colors.ADV_CLR_BORDERS.getY()));
 
             preferredIcons.dispose();
             pxDefaultAvatars.dispose();
@@ -555,15 +574,10 @@ public class FSkin {
             adventureButtons.dispose();
         }
         catch (final Exception e) {
-            System.err.println("FSkin$loadFull: Missing a sprite (default icons, "
-                    + "preferred icons, or foils.");
-            //e.printStackTrace();
+            System.err.println("FSkin$loadFull: Missing a sprite (default icons, preferred icons, or foils.");
         }
 
-        // Run through enums and load their coords.
         FSkinColor.updateAll();
-
-        // Images loaded; can start UI init.
         loaded = true;
 
         if (splashScreen != null) {
@@ -571,32 +585,18 @@ public class FSkin {
         }
     }
 
-    /**
-     * Gets the name.
-     * 
-     * @return Name of the current skin.
-     */
     public static String getName() {
         return FSkin.preferredName;
     }
 
-    /**
-     * Gets a FileHandle for a file within the directory where skin files should be stored
-     */
     public static FileHandle getSkinFile(String filename) {
         return preferredDir.child(filename);
     }
 
-    /**
-     * Gets a FileHandle for a file within the directory where the default skin files should be stored
-     */
     public static FileHandle getDefaultSkinFile(String filename) {
         return Assets.getFileHandle(ForgeConstants.DEFAULT_SKINS_DIR + filename);
     }
 
-    /**
-     * Gets a FileHandle for a file within the planechase cache directory
-     */
     public static FileHandle getCachePlanechaseFile(String filename) {
         return Assets.getFileHandle(ForgeConstants.CACHE_PLANECHASE_PICS_DIR + filename);
     }
@@ -605,11 +605,6 @@ public class FSkin {
         return preferredDir;
     }
 
-    /**
-     * Gets the skins.
-     *
-     * @return the skins
-     */
     public static Array<String> getSkinDirectoryNames() {
         final Array<String> mySkins = new Array<>();
 
@@ -629,7 +624,7 @@ public class FSkin {
     public static Iterable<String> getAllSkins() {
         if (allSkins != null) {
             allSkins.clear();
-            allSkins.add("Default"); //init default
+            allSkins.add("Default");
             final Array<String> skinDirectoryNames = getSkinDirectoryNames();
             for (final String skinDirectoryName : skinDirectoryNames) {
                 allSkins.add(WordUtil.capitalize(skinDirectoryName.replace('_', ' ')));
@@ -667,5 +662,7 @@ public class FSkin {
         return Forge.getAssets().cursor();
     }
 
-    public static boolean isLoaded() { return loaded; }
+    public static boolean isLoaded() {
+        return loaded;
+    }
 }
